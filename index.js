@@ -3,10 +3,38 @@ const Database = require('@replit/database')
 const { v4: uuidv4 } = require('uuid');
 const bodyParser = require('body-parser');
 
+const {Transaction,TYPES,Stage,STATUS} = require('./models/Transaction.js');
+const  Transactions = require('./functions/transactions.js');
+
 const app = express();
 app.use(bodyParser.json());
 
 const db = new Database();
+
+var transactions = [];
+
+app.get('/sandbox',(req, res) => {
+  
+  var transaction1 = new Transaction(TYPES.IN, "salary", "Fenyx Consult salary",2280.11)
+  transactions.push(transaction1);
+  transaction1.stages.push(new Stage("2021-04-07",STATUS.PAID));
+  transaction1.stages.push(new Stage("2021-04-07",STATUS.PLANNED));
+
+  var transaction2 = new Transaction(TYPES.OUT, "FOOD", "Burger King",5.99)
+  transactions.push(transaction2);
+  transaction2.stages.push(new Stage("2021-04-06",STATUS.PAID));
+  transaction2.stages.push(new Stage("2021-04-06",STATUS.PAID));
+  
+  var transaction3 = new Transaction(TYPES.OUT, "FOOD", "Tacos chez Max",10.99)
+  transactions.push(transaction3);
+  transaction3.stages.push(new Stage("2021-04-07",STATUS.PAID));
+  transaction3.stages.push(new Stage("2021-04-07",STATUS.TRANSFERRED));
+  
+  var result = Transactions.getTotalAmountUntilTransferredOut(transactions);
+
+  res.status(200);
+  res.send(result.toString());
+});
 
 app.get('/',(req, res) => {
   res.status(200);
@@ -19,20 +47,32 @@ app.post('/account', (req, res) => {
 
   if(isAuth(key)) {
 
-    var accountID = uuidv4();
+    var name = req.body.name;
 
-    var account = {
-      name : req.body.name,
-      status : 'created',
-      id : accountID
+    if(typeof name == 'string') {
+
+      var accountID = uuidv4();
+
+      var account = {
+        name : name,
+        status : 'created',
+        id : accountID
+      }
+
+      db.set(accountID,account).then(() => {
+
+        res.status(201);
+        res.send(account);
+
+      });
+
     }
 
-    db.set(accountID,account).then(() => {
-
-      res.status(201);
-      res.send(account);
-
-    });
+    else {
+      res.status(400);
+      res.send({
+        message:"JSON body must contains 'name' key with string value"});
+    }  
 
   }
   else {
@@ -72,10 +112,17 @@ app.get('/accounts/:id', (req, res) => {
 
     var id = req.params.id;
 
-    db.get(id).then(value => {
+    db.get(id).then(account => {
 
-      res.status(200);
-      res.send(value);
+      if(account){
+        res.status(200);
+        res.send(account);
+      }
+      else {
+        res.status(404);
+        res.send(id+  " account is not found");
+      }
+      
       
     });
 
